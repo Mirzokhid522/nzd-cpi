@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Zealand CPI Inflation Dashboard (2024+)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chart.js DataLabels Plugin CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
+</head>
+<body class="bg-[#191919] text-[#dfdfdf] font-sans min-h-screen flex flex-col justify-between p-8">
+
+    <!-- Header -->
+    <header class="w-full max-w-7xl mx-auto py-3 border-b border-[#2f2f2f] flex justify-between items-center">
+        <div>
+            <h1 class="text-xl font-semibold tracking-tight text-[#fbfbfb]">NZD Inflation Dashboard</h1>
+            <p class="text-xs text-[#9b9b9b]">CPI Percentage Change (2024 – Present)</p>
+        </div>
+        <div class="flex items-center space-x-2">
+            <button onclick="updateChartType('bar')" id="btnBar" class="text-xs bg-[#2f2f2f] border border-[#3f3f3f] text-[#fbfbfb] px-3 py-1.5 rounded-md font-medium transition shadow-sm">Bar Chart</button>
+            <button onclick="updateChartType('line')" id="btnLine" class="text-xs bg-transparent border border-transparent text-[#9b9b9b] px-3 py-1.5 rounded-md font-medium transition hover:text-[#fbfbfb]">Line Chart</button>
+        </div>
+    </header>
+
+    <!-- Main Content / Chart Container -->
+    <main class="w-full max-w-7xl mx-auto my-6 bg-[#202020] border border-[#2f2f2f] rounded-lg p-6 shadow-xl">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-sm font-medium text-[#c8c8c8]">Annual (YoY) vs Quarterly (QoQ) Change</h2>
+            <span class="text-xs text-[#7f7f7f]">Stats NZ</span>
+        </div>
+        <div class="relative h-[540px] w-full">
+            <canvas id="cpiBarChart"></canvas>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="w-full max-w-7xl mx-auto text-center text-xs text-[#666666] py-2">
+    </footer>
+
+    <!-- Chart Rendering & Logic -->
+    <script>
+        let myChart = null;
+
+        async function loadChartData(chartType = 'bar') {
+            try {
+                const response = await fetch('/api/data');
+                const data = await response.json();
+
+                if (data.error) {
+                    console.error(data.error);
+                    return;
+                }
+
+                const labels = data.map(item => item.quarter);
+                const yoyValues = data.map(item => item.yoy);
+                const qoqValues = data.map(item => item.qoq);
+
+                const ctx = document.getElementById('cpiBarChart').getContext('2d');
+                
+                if (myChart) {
+                    myChart.destroy();
+                }
+
+                myChart = new Chart(ctx, {
+                    type: chartType,
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'YoY % Change (Annual)',
+                                data: yoyValues,
+                                backgroundColor: 'rgba(235, 87, 87, 0.85)', // Notion soft red/coral accent or clean contrast
+                                borderColor: '#eb5757',
+                                borderWidth: chartType === 'line' ? 2 : 1,
+                                borderRadius: chartType === 'bar' ? 4 : 0,
+                                tension: 0.2
+                            },
+                            {
+                                label: 'QoQ % Change (Quarterly)',
+                                data: qoqValues,
+                                backgroundColor: 'rgba(45, 156, 219, 0.85)', // Notion soft blue accent
+                                borderColor: '#2d9cdb',
+                                borderWidth: chartType === 'line' ? 2 : 1,
+                                borderRadius: chartType === 'bar' ? 4 : 0,
+                                tension: 0.2
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            datalabels: {
+                                display: function(context) {
+                                    return context.chart.config.type === 'bar';
+                                },
+                                color: '#fbfbfb',
+                                font: {
+                                    size: 11,
+                                    weight: 'bold',
+                                    family: 'sans-serif'
+                                },
+                                anchor: 'end',
+                                align: 'top',
+                                formatter: function(value) {
+                                    return value !== null ? value + '%' : '';
+                                }
+                            },
+                            legend: {
+                                position: 'top',
+                                labels: { color: '#b2b2b2', font: { size: 11 } }
+                            },
+                            tooltip: {
+                                backgroundColor: '#191919',
+                                titleColor: '#ffffff',
+                                bodyColor: '#dfdfdf',
+                                borderColor: '#333333',
+                                borderWidth: 1,
+                                padding: 12
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                                ticks: { color: '#888888', font: { size: 11 } }
+                            },
+                            y: {
+                                grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                                ticks: { color: '#888888' },
+                                suggestedMax: 6.0 
+                            }
+                        }
+                    },
+                    plugins: [ChartDataLabels]
+                });
+
+            } catch (err) {
+                console.error("Failed to load chart data:", err);
+            }
+        }
+
+        function updateChartType(type) {
+            const btnBar = document.getElementById('btnBar');
+            const btnLine = document.getElementById('btnLine');
+
+            if (type === 'bar') {
+                btnBar.className = "text-xs bg-[#2f2f2f] border border-[#3f3f3f] text-[#fbfbfb] px-3 py-1.5 rounded-md font-medium transition shadow-sm";
+                btnLine.className = "text-xs bg-transparent border border-transparent text-[#9b9b9b] px-3 py-1.5 rounded-md font-medium transition hover:text-[#fbfbfb]";
+            } else {
+                btnLine.className = "text-xs bg-[#2f2f2f] border border-[#3f3f3f] text-[#fbfbfb] px-3 py-1.5 rounded-md font-medium transition shadow-sm";
+                btnBar.className = "text-xs bg-transparent border border-transparent text-[#9b9b9b] px-3 py-1.5 rounded-md font-medium transition hover:text-[#fbfbfb]";
+            }
+
+            loadChartData(type);
+        }
+
+        // Initial load
+        loadChartData('bar');
+    </script>
+</body>
+</html>
